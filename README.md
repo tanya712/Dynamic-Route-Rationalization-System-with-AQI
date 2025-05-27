@@ -1,6 +1,4 @@
-# Dynamic-Route-Rationalization-model
-Problem Statement:- Dynamic route rationalization model based on machine learning/AI would be required based on real-time traffic and road parameters.
-<br>
+
 # Dynamic Route Rationalization System with AQI
 
 This project optimizes route selection dynamically based on real-time traffic data and air quality index (AQI). It combines machine learning models for travel duration prediction and a web-based interface for visualization.
