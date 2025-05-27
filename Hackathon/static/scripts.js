@@ -1,13 +1,14 @@
 let map;
 let directionsService;
 let directionsRenderer;
-let trafficLayer;
+let trafficLayer
 let autocompleteStart;
 let autocompleteEnd;
 let markers = [];
 let polylines = [];
-let busMarkers = [];
-let geocoder;
+const apiKey = "a91c713695fa09b057ed1b6a4bfd044a";
+const url = "http://api.openweathermap.org/data/2.5/air_pollution?lat=${lat}&lon=${lon}&appid=${apiKey}";
+
 
 function initMap() {
     map = new google.maps.Map(document.getElementById('map'), {
@@ -227,21 +228,7 @@ function calculateRouteAndTrafficLevel(origin, destination, apiKey) {
 }
 
 
-// function getTrafficLevel(route) {
-//     const durationInTraffic = route.legs[0].duration_in_traffic ? route.legs[0].duration_in_traffic.value : route.legs[0].duration.value;
-//     const regularDuration = route.legs[0].duration.value;
 
-//     // Calculate traffic ratio
-//     const trafficRatio = durationInTraffic / regularDuration;
-
-//     // If there's no significant traffic, keep a lower bound on traffic level
-//     let trafficLevel = Math.round((trafficRatio - 1) * 10);
-
-//     // Ensure trafficLevel is between 1 and 10
-//     trafficLevel = Math.min(Math.max(trafficLevel, 1), 10); 
-
-//     return trafficLevel;
-// }
 function getTrafficLevel(route) {
     // Use duration_in_traffic if available, otherwise fall back to duration
     const durationInTraffic = route.legs[0].duration_in_traffic ? route.legs[0].duration_in_traffic.value : route.legs[0].duration.value;
@@ -355,5 +342,96 @@ function calculateRoutes() {
     });
 }
 
+// Function to fetch air pollution data for a given location
+function getAirPollutionData(lat, lon) {
+    const url = `http://api.openweathermap.org/data/2.5/air_pollution?lat=${lat}&lon=${lon}&appid=${apiKey}`;
 
+    return fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            const aqi = data.list[0].main.aqi; // Air Quality Index (1-5)
+            return aqi;
+        })
+        .catch(error => {
+            console.error("Error fetching air pollution data:", error);
+        });
+}
+
+// Function to fetch weather data for a given location
+function getWeatherData(lat, lon) {
+    const url = `http://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}`;
+
+    return fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            const weather = data.weather[0].main; // e.g., "Rain", "Clear"
+            const visibility = data.visibility; // Visibility in meters
+            const windSpeed = data.wind.speed; // Wind speed in m/s
+            return { weather, visibility, windSpeed };
+        })
+        .catch(error => {
+            console.error("Error fetching weather data:", error);
+        });
+}
+
+// Function to display weather and air quality data
+function displayWeatherInfo(weatherData, airPollution, location) {
+    const weatherContainer = document.getElementById(`${location}-weather`);
+    const airQualityContainer = document.getElementById(`${location}-air-quality`);
+
+    const weatherInfo = `
+        <h3>Weather at ${location}:</h3>
+        <p>Condition: ${weatherData.weather}</p>
+        <p>Visibility: ${(weatherData.visibility / 1000).toFixed(1)} km</p>
+        <p>Wind Speed: ${weatherData.windSpeed} m/s</p>
+    `;
+
+    const airQualityInfo = `
+        <h3>Air Quality Index at ${location}:</h3>
+        <p>AQI: ${airPollution} (1=Good, 5=Hazardous)</p>
+    `;
+
+    weatherContainer.innerHTML = weatherInfo;
+    airQualityContainer.innerHTML = airQualityInfo;
+}
+
+// Modify calculateRoutes function to include weather and air quality data
+async function calculateRoutes() {
+    const start = document.getElementById("start").value;
+    const end = document.getElementById("end").value;
+
+    if (!start || !end) {
+        alert("Please enter both start and end locations");
+        return;
+    }
+
+    const request = {
+        origin: start,
+        destination: end,
+        travelMode: google.maps.TravelMode.DRIVING,
+        provideRouteAlternatives: true,
+    };
+
+    directionsService.route(request, async function (result, status) {
+        if (status === google.maps.DirectionsStatus.OK) {
+            const startLocation = result.routes[0].legs[0].start_location;
+            const endLocation = result.routes[0].legs[0].end_location;
+
+            // Fetch weather and air pollution data for start and end locations
+            const startWeatherData = await getWeatherData(startLocation.lat(), startLocation.lng());
+            const startAirPollution = await getAirPollutionData(startLocation.lat(), startLocation.lng());
+
+            const endWeatherData = await getWeatherData(endLocation.lat(), endLocation.lng());
+            const endAirPollution = await getAirPollutionData(endLocation.lat(), endLocation.lng());
+
+            // Display weather and air quality information
+            displayWeatherInfo(startWeatherData, startAirPollution, "start");
+            displayWeatherInfo(endWeatherData, endAirPollution, "end");
+
+            displayRoutes(result);
+        } else {
+            alert("Failed to get routes: " + status);
+        }
+    });
+}
 
